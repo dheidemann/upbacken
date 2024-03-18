@@ -1,0 +1,80 @@
+#!/bin/bash
+
+install_path=$(which upbacken)
+
+usage() {
+    echo "Usage: $0 [-h|--help] <command> [<args>...]"
+    echo "Commands:"
+    echo "    init                Initialize nextcloud connection"
+    echo "    sync                Sync local folders with cloud"
+    echo "    add                 Add backup path: [-p <local path>] [-d <dest path>]"
+    echo "    rm                  Delete path"
+    exit 1
+}
+
+sync() {
+    echo "Syncing with nextcloud..."
+    while IFS=' ' read -r p d; do
+        rclone sync local:$p nextcloud:$d --progress
+    done < $install_path/paths
+}
+
+case "$1" in
+    init)
+        if ! command -v rclone &> /dev/null; then
+            sudo pacman -Sq rclone
+        fi
+        read -p "url: " url
+        read -p "user: " user
+        echo -n "pass: " 
+        read -s pass
+        echo
+        rclone config create nextcloud webdav vendor nextcloud url $url user $user pass $pass 
+        rclone config create local local
+        touch $install_path/paths
+        ;;
+    sync)
+        sync
+        ;;
+    add)
+        path=$(pwd)
+        dest=""
+        while [[ $# -gt 0 ]]; do
+            key="$1"
+            case $key in
+                -p)
+                    path=$(realpath $2)
+                    shift
+                    ;;
+                -d)
+                    dest=$2
+                    shift
+                    ;;
+                *)
+                    ;;
+            esac
+            shift
+        done
+        echo "$path $dest" >> $install_path/paths
+        echo "added: $path -> nextcloud:$dest"
+        read -p "sync now? (Y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ || -z $REPLY ]]; then
+            sync
+        fi
+        ;;
+    rm)
+        i=1
+        while IFS=' ' read -r p d; do
+            echo "$i) $p -> $d" 
+            ((i=i+1))
+        done < $install_path/paths
+        echo "---"
+        read -p "delete: " i
+        sed -i "${i}d" $install_path/paths 
+        ;;
+    *)
+        echo "Error: Invalid command '$1'"
+        usage
+        ;;
+esac
