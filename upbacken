@@ -1,6 +1,6 @@
 #!/bin/bash
 
-install_path=$(which upbacken)
+install_path=$(which upbacken | cut -c -25)
 
 usage() {
     echo "Usage: $0 [-h|--help] <command> [<args>...]"
@@ -31,7 +31,6 @@ case "$1" in
         echo
         rclone config create nextcloud webdav vendor nextcloud url $url user $user pass $pass 
         rclone config create local local
-        touch $install_path/paths
         ;;
     sync)
         sync
